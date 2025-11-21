@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sky Float: Mental Uplift</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Fredoka', sans-serif;
+            overscroll-behavior: none;
+            touch-action: none;
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA); /* Sky Gradient */
+            color: #1e293b;
+            transition: background 2s ease;
+        }
+
+        body.storm-mode {
+            background: linear-gradient(to bottom, #475569, #64748b); /* Dark Storm */
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Floating Animation for UI */
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .float-anim { animation: float 4s ease-in-out infinite; }
+
+        /* Glass Panel UI */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
+        }
+
+        /* Chat Bubbles */
+        .chat-container { scrollbar-width: thin; }
+        .user-msg { background: #3b82f6; color: white; border-radius: 18px 18px 4px 18px; }
+        .ai-msg { background: #ffffff; color: #334155; border-radius: 18px 18px 18px 4px; border: 1px solid #cbd5e1; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        
+        /* Cloud Animation */
+        .cloud {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.6;
+            animation: drift 20s linear infinite;
+        }
+        @keyframes drift { from { transform: translateX(-100px); } to { transform: translateX(120vw); } }
+
+        /* Legend Grid */
+        .legend-grid {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 8px;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body class="h-screen w-full overflow-hidden relative select-none">
+
+    <!-- BACKGROUND CLOUDS -->
+    <div id="cloudContainer" class="absolute inset-0 z-0 pointer-events-none overflow-hidden"></div>
+
+    <!-- MAIN MENU -->
+    <div id="mainMenu" class="absolute inset-0 z-50 flex flex-col items-center justify-center p-6 text-center bg-sky-100/80 backdrop-blur-sm transition-opacity duration-500">
+        <div class="mb-6 float-anim text-8xl">🎈</div>
+        
+        <h1 class="text-5xl md:text-7xl font-bold text-sky-600 mb-2 drop-shadow-sm">SKY FLOAT</h1>
+        <p class="text-slate-500 text-xl mb-8 font-semibold">Rise Above the Storm</p>
+
+        <div class="grid gap-4 w-full max-w-xs relative z-20">
+            <button onclick="showGuide()" class="group relative px-8 py-4 bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-500 hover:to-blue-600 rounded-2xl border-b-4 border-blue-700 transition-all hover:scale-105 shadow-lg">
+                <span class="text-2xl font-bold text-white flex items-center justify-center gap-2">🎮 PLAY GAME</span>
+            </button>
+
+            <button onclick="startQuiz()" class="group relative px-8 py-4 bg-white hover:bg-purple-50 rounded-2xl border-b-4 border-purple-200 hover:border-purple-300 transition-all hover:scale-105 shadow-lg">
+                <span class="text-2xl font-bold text-purple-500 flex items-center justify-center gap-2">🧠 MIND QUIZ</span>
+            </button>
+
+            <button onclick="openZenChat()" class="group relative px-8 py-4 bg-white hover:bg-orange-50 rounded-2xl border-b-4 border-orange-200 hover:border-orange-300 transition-all hover:scale-105 shadow-lg">
+                <span class="text-2xl font-bold text-orange-500 flex items-center justify-center gap-2">🧸 FRIEND BOT</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME HUD -->
+    <div id="gameHUD" class="absolute inset-0 pointer-events-none hidden z-40">
+        <!-- Score -->
+        <div class="absolute top-6 left-6 pointer-events-auto">
+            <div class="bg-white/90 backdrop-blur px-4 py-2 rounded-xl shadow-lg border border-white flex flex-col">
+                <div class="text-xs text-sky-500 font-bold tracking-widest uppercase">Happiness</div>
+                <div class="text-4xl font-bold text-slate-700" id="scoreDisplay">0</div>
+            </div>
+        </div>
+
+        <!-- Pause Button -->
+        <div class="absolute top-6 right-6 pointer-events-auto flex gap-3">
+             <button onclick="togglePause()" class="bg-white/90 hover:bg-sky-50 w-12 h-12 rounded-xl shadow-lg border border-white text-sky-600 font-black text-xl flex items-center justify-center transition">
+                ⏸
+            </button>
+        </div>
+
+        <!-- Health Bar -->
+        <div class="absolute top-20 right-6 pointer-events-auto">
+            <div class="bg-white/90 backdrop-blur px-4 py-2 rounded-xl shadow-lg border border-white">
+                <div class="text-xs text-rose-400 font-bold tracking-widest uppercase text-right">Resilience</div>
+                <div class="flex gap-1 justify-end mt-1 text-2xl" id="healthDisplay">
+                    ❤️❤️❤️
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Powerup Indicator -->
+        <div id="powerupIndicator" class="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 px-6 py-2 rounded-full font-bold shadow-xl border-2 border-white hidden animate-bounce">
+            🛡️ SHIELD ACTIVE
+        </div>
+
+        <!-- Floating Text Container -->
+        <div id="floatingMsg" class="absolute top-1/4 left-1/2 transform -translate-x-1/2 text-4xl font-black text-white drop-shadow-lg opacity-0 transition-opacity duration-500 text-center whitespace-nowrap pointer-events-none"></div>
+    </div>
+
+    <!-- GAME CANVAS -->
+    <canvas id="gameCanvas" class="hidden absolute inset-0 z-30 cursor-none"></canvas>
+
+    <!-- GUIDE / PAUSE MODAL -->
+    <div id="guideOverlay" class="absolute inset-0 z-[60] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="glass-panel w-full max-w-md p-6 rounded-3xl text-center shadow-2xl transform transition-all scale-100 max-h-[90vh] overflow-y-auto">
+            <h2 id="guideTitle" class="text-3xl font-bold text-slate-800 mb-4">HOW TO PLAY</h2>
+            
+            <div class="bg-sky-50 rounded-xl p-4 mb-4 text-left space-y-3">
+                <p class="text-slate-500 font-bold text-xs uppercase tracking-widest border-b border-sky-200 pb-1">Collect Good Vibes</p>
+                <div class="legend-grid">
+                    <span class="text-2xl">☀️</span> <span class="text-slate-700 font-bold">Sunshine</span> <span class="text-green-600 font-bold">+10</span>
+                    <span class="text-2xl">🌈</span> <span class="text-slate-700 font-bold">Rainbow</span> <span class="text-green-600 font-bold">+20</span>
+                    <span class="text-2xl">✨</span> <span class="text-slate-700 font-bold">Sparkle</span> <span class="text-green-600 font-bold">+50</span>
+                </div>
+
+                <p class="text-slate-500 font-bold text-xs uppercase tracking-widest border-b border-sky-200 pb-1 mt-4">Super Abilities</p>
+                <div class="legend-grid">
+                    <span class="text-2xl">🛡️</span> <span class="text-slate-700 font-bold">Star Shield</span> <span class="text-blue-600 text-xs">Invincible (5s)</span>
+                    <span class="text-2xl">🧲</span> <span class="text-slate-700 font-bold">Magnet</span> <span class="text-blue-600 text-xs">Attracts Orbs</span>
+                </div>
+
+                <p class="text-slate-500 font-bold text-xs uppercase tracking-widest border-b border-rose-200 pb-1 mt-4">Avoid Stressors</p>
+                <div class="legend-grid">
+                    <span class="text-2xl">⚓</span> <span class="text-slate-700 font-bold">Anchor</span> <span class="text-rose-600 font-bold">-1 ❤️</span>
+                    <span class="text-2xl">🌧️</span> <span class="text-slate-700 font-bold">Rain Cloud</span> <span class="text-rose-600 font-bold">-20 Pts</span>
+                    <span class="text-2xl">⚡</span> <span class="text-slate-700 font-bold">Lightning</span> <span class="text-rose-600 font-bold text-xs">Very Fast (-1 ❤️)</span>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="quitToMenu()" class="flex-1 py-3 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-600 font-bold transition">Quit</button>
+                <button id="guideResumeBtn" onclick="startGameFromGuide()" class="flex-1 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold shadow-md transition">Start</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME OVER / QUIZ MODAL -->
+    <div id="modalOverlay" class="absolute inset-0 z-[60] bg-sky-900/90 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="glass-panel w-full max-w-md p-8 rounded-3xl text-center shadow-2xl">
+            <div id="modalIcon" class="text-7xl mb-4 float-anim">✨</div>
+            <h2 id="modalTitle" class="text-3xl font-bold text-slate-800 mb-2">Title</h2>
+            <p id="modalSubtitle" class="text-slate-500 mb-6 text-lg">Subtitle</p>
+            
+            <div id="modalContent" class="mb-6 text-left w-full"></div>
+
+            <!-- AI Feedback -->
+            <div id="aiFeedbackBox" class="hidden bg-sky-50 p-4 rounded-xl border border-sky-100 text-left mb-6 max-h-40 overflow-y-auto">
+                <p class="text-xs text-sky-500 font-bold mb-1 uppercase flex items-center gap-2">
+                    <span class="w-2 h-2 bg-sky-400 rounded-full animate-pulse"></span> Wise Words
+                </p>
+                <div id="aiText" class="text-sm text-slate-600 leading-relaxed italic"></div>
+            </div>
+
+            <div class="flex gap-3">
+                <button id="modalBtnSecondary" onclick="goHome()" class="flex-1 py-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold transition">Menu</button>
+                <button id="modalBtnPrimary" class="flex-1 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold shadow-md transition">Action</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ZEN CHAT DRAWER -->
+    <div id="chatDrawer" class="absolute inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 flex flex-col border-l border-slate-100">
+        <div class="p-4 bg-sky-100 border-b border-sky-200 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-white flex items-center justify-center text-2xl shadow-sm">🧸</div>
+                <div><h3 class="font-bold text-slate-800 text-lg">Friend Bot</h3><p class="text-xs text-sky-600 font-bold">Always here for you</p></div>
+            </div>
+            <button onclick="closeZenChat()" class="w-8 h-8 flex items-center justify-center bg-white hover:bg-slate-100 rounded-full text-slate-500 font-bold transition">✕</button>
+        </div>
+        <div id="chatHistory" class="flex-1 overflow-y-auto p-4 space-y-4 chat-container bg-slate-50"><div class="ai-msg p-4 text-sm">Hi there! 🌟 I'm your Friend Bot. How are you feeling today?</div></div>
+        <div class="p-4 bg-white border-t border-slate-100"><div class="flex gap-2"><input type="text" id="chatInput" placeholder="Type here..." class="flex-1 bg-slate-100 text-slate-800 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-300" onkeypress="if(event.key==='Enter') sendMessage()"><button onclick="sendMessage()" class="bg-sky-500 hover:bg-sky-400 text-white p-3 rounded-xl transition">➤</button></div></div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const API_KEY = "AIzaSyDzvbHNZUKrUJ9R98qHkhZPAjST25IfzOM"; 
+
+        // --- CLOUDS ---
+        function initClouds() {
+            const container = document.getElementById('cloudContainer');
+            container.innerHTML = '';
+            for(let i=0; i<8; i++) {
+                const cloud = document.createElement('div');
+                cloud.className = 'cloud';
+                cloud.style.width = Math.random() * 200 + 100 + 'px';
+                cloud.style.height = Math.random() * 60 + 40 + 'px';
+                cloud.style.top = Math.random() * 80 + '%';
+                cloud.style.animationDuration = Math.random() * 30 + 20 + 's';
+                cloud.style.animationDelay = -Math.random() * 20 + 's';
+                container.appendChild(cloud);
+            }
+        }
+        initClouds();
+
+        // --- GAME ENGINE ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let gameState = 'menu'; // menu, playing, paused, gameover
+        let gameScore = 0;
+        let gameHealth = 3;
+        let gameDifficulty = 1;
+        let player = { x: 0, y: 0, size: 40 }; // Balloon
+        let entities = [];
+        let input = { x: 0, y: 0, active: false };
+        let lastTime = 0;
+        let powerup = { type: null, timer: 0 };
+        let wind = 0;
+        let isStorm = false;
+
+        function resizeGame() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            if(gameState === 'menu') { player.x = canvas.width/2; player.y = canvas.height/2; }
+        }
+        window.addEventListener('resize', resizeGame);
+        resizeGame();
+
+        // --- MENU & GUIDES ---
+        function showGuide() {
+            document.getElementById('guideOverlay').classList.remove('hidden');
+            document.getElementById('guideTitle').innerText = "HOW TO PLAY";
+            const btn = document.getElementById('guideResumeBtn');
+            
+            if (gameState === 'paused') {
+                btn.innerText = "RESUME";
+                btn.onclick = togglePause; // Resume
+            } else {
+                btn.innerText = "START";
+                btn.onclick = startGame;
+            }
+        }
+
+        function quitToMenu() {
+            document.getElementById('guideOverlay').classList.add('hidden');
+            goHome();
+        }
+
+        function startGameFromGuide() {
+            // Only used by START button logic, resumes handled by togglePause
+            document.getElementById('guideOverlay').classList.add('hidden');
+            startGame();
+        }
+
+        function togglePause() {
+            if (gameState === 'playing') {
+                gameState = 'paused';
+                showGuide(); // Reuse guide as pause menu
+            } else if (gameState === 'paused') {
+                gameState = 'playing';
+                document.getElementById('guideOverlay').classList.add('hidden');
+                lastTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function startGame() {
+            document.getElementById('mainMenu').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('gameHUD').classList.remove('hidden');
+            document.getElementById('guideOverlay').classList.add('hidden');
+            canvas.classList.remove('hidden');
+            
+            gameState = 'playing';
+            gameScore = 0;
+            gameHealth = 3;
+            gameDifficulty = 1;
+            entities = [];
+            powerup = { type: null, timer: 0 };
+            wind = 0;
+            isStorm = false;
+            document.body.classList.remove('storm-mode');
+            
+            resizeGame();
+            player.x = canvas.width/2; player.y = canvas.height - 100;
+            updateHUD();
+            
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameLoop(timestamp) {
+            if (gameState !== 'playing') return;
+            const dt = (timestamp - lastTime) / 16;
+            lastTime = timestamp;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Difficulty Ramping
+            gameDifficulty += 0.0005; // Slowly gets faster
+            
+            // Storm Logic (Every ~30 seconds)
+            if (gameDifficulty > 1.5 && Math.random() < 0.001) startStorm();
+            if (isStorm && Math.random() < 0.005) endStorm();
+
+            // Wind Logic
+            wind = Math.sin(timestamp / 1000) * (isStorm ? 5 : 1);
+
+            // 2. Player Movement
+            if (input.active) {
+                player.x += (input.x - player.x) * 0.1;
+                player.y += (input.y - player.y) * 0.1;
+            }
+            // Apply Wind to Player
+            player.x += wind;
+
+            // Magnet Logic
+            if (powerup.type === 'magnet') {
+                // Draw Magnet Aura
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, 150, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Shield Logic
+            if (powerup.type === 'shield') {
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, 55, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(147, 197, 253, 0.4)';
+                ctx.fill();
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Powerup Timer
+            if (powerup.timer > 0) {
+                powerup.timer -= dt;
+                if (powerup.timer <= 0) {
+                    powerup.type = null;
+                    document.getElementById('powerupIndicator').classList.add('hidden');
+                }
+            }
+
+            // 3. Draw Player
+            ctx.font = "60px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.shadowColor = "rgba(0,0,0,0.2)";
+            ctx.shadowBlur = 15;
+            ctx.fillText("🎈", player.x, player.y);
+            ctx.shadowBlur = 0;
+
+            // 4. Spawning
+            // Spawn rate increases with difficulty
+            if (Math.random() < 0.03 * gameDifficulty) spawnEntity();
+
+            // 5. Entities Update
+            for (let i = entities.length - 1; i >= 0; i--) {
+                let e = entities[i];
+                
+                // Movement
+                let speed = e.speed * (isStorm ? 1.5 : 1);
+                e.y += speed;
+                e.rot += 0.02;
+
+                // Magnet Pull
+                if (powerup.type === 'magnet' && e.type === 'good') {
+                    let dx = player.x - e.x;
+                    let dy = player.y - e.y;
+                    let dist = Math.hypot(dx, dy);
+                    if (dist < 300) {
+                        e.x += dx * 0.05;
+                        e.y += dy * 0.05;
+                    }
+                }
+
+                // Draw
+                ctx.save();
+                ctx.translate(e.x, e.y);
+                ctx.rotate(e.rot);
+                ctx.font = `${e.size}px Arial`;
+                ctx.fillText(e.icon, 0, 0);
+                ctx.restore();
+
+                // Collision
+                const dist = Math.hypot(player.x - e.x, player.y - e.y);
+                if (dist < 50) {
+                    handleCollision(e);
+                    entities.splice(i, 1);
+                } else if (e.y > canvas.height + 50) {
+                    entities.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startStorm() {
+            isStorm = true;
+            document.body.classList.add('storm-mode');
+            showFloatText("STORM APPROACHING!", "#FFFFFF");
+        }
+
+        function endStorm() {
+            isStorm = false;
+            document.body.classList.remove('storm-mode');
+        }
+
+        function spawnEntity() {
+            const rand = Math.random();
+            let type = 'bad';
+            let icon = '⚓';
+            let points = 0;
+
+            // Spawn Logic
+            if (rand > 0.98) { type = 'powerup'; icon = Math.random()>0.5 ? '🛡️' : '🧲'; }
+            else if (rand > 0.6) { 
+                type = 'good'; 
+                let r = Math.random();
+                if (r > 0.9) { icon = '✨'; points = 50; }
+                else if (r > 0.6) { icon = '🌈'; points = 20; }
+                else { icon = '☀️'; points = 10; }
+            } else {
+                type = 'bad';
+                if (isStorm && Math.random() > 0.7) { icon = '⚡'; } // Lightning in storm
+                else if (Math.random() > 0.8) { icon = '🌧️'; }
+                else { icon = '⚓'; }
+            }
+            
+            entities.push({
+                x: Math.random() * (canvas.width - 40) + 20,
+                y: -50,
+                size: Math.random() * 20 + 40,
+                speed: (icon === '⚡' ? 8 : Math.random() * 2 + 2), // Lightning is fast
+                type: type,
+                icon: icon,
+                points: points,
+                rot: (Math.random()-0.5)
+            });
+        }
+
+        function handleCollision(e) {
+            if (e.type === 'good') {
+                gameScore += e.points;
+                showFloatText(`+${e.points}`, "#22c55e");
+                playSound('good');
+            } else if (e.type === 'powerup') {
+                playSound('good');
+                if (e.icon === '🛡️') {
+                    powerup = { type: 'shield', timer: 300 }; // ~5 sec
+                    showFloatText("SHIELD UP!", "#3b82f6");
+                    document.getElementById('powerupIndicator').innerText = "🛡️ SHIELD ACTIVE";
+                    document.getElementById('powerupIndicator').classList.remove('hidden');
+                } else {
+                    powerup = { type: 'magnet', timer: 300 };
+                    showFloatText("MAGNETIC!", "#eab308");
+                    document.getElementById('powerupIndicator').innerText = "🧲 MAGNET ACTIVE";
+                    document.getElementById('powerupIndicator').classList.remove('hidden');
+                }
+            } else {
+                // Bad
+                if (powerup.type === 'shield') {
+                    showFloatText("BLOCKED!", "#3b82f6");
+                    playSound('good'); // Satisfying block sound
+                    return;
+                }
+
+                playSound('bad');
+                navigator.vibrate?.(200);
+                
+                if (e.icon === '🌧️') {
+                    gameScore = Math.max(0, gameScore - 20);
+                    showFloatText("-20 PTS", "#94a3b8");
+                } else {
+                    gameHealth--;
+                    showFloatText("-1 ❤️", "#ef4444");
+                }
+                
+                updateHUD();
+                if (gameHealth <= 0) gameOver();
+            }
+            updateHUD();
+        }
+
+        function updateHUD() {
+            document.getElementById('scoreDisplay').innerText = gameScore;
+            document.getElementById('healthDisplay').innerText = '❤️'.repeat(Math.max(0, gameHealth));
+        }
+
+        function showFloatText(text, color) {
+            const el = document.getElementById('floatingMsg');
+            el.innerText = text;
+            el.style.color = color;
+            el.style.opacity = 1;
+            el.style.transform = "translate(-50%, -50px) scale(1.2)";
+            setTimeout(() => {
+                el.style.opacity = 0;
+                el.style.transform = "translate(-50%, 0) scale(1)";
+            }, 800);
+        }
+
+        // INPUT HANDLERS
+        function handleInput(x, y) { input.x = x; input.y = y; input.active = true; }
+        window.addEventListener('mousemove', e => handleInput(e.clientX, e.clientY));
+        window.addEventListener('touchmove', e => { e.preventDefault(); handleInput(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+        window.addEventListener('touchstart', e => { handleInput(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+
+        // --- GAME OVER ---
+        async function gameOver() {
+            gameState = 'gameover';
+            const modal = document.getElementById('modalOverlay');
+            modal.classList.remove('hidden');
+            document.getElementById('modalIcon').innerText = "🧘";
+            document.getElementById('modalTitle').innerText = "Rest Time";
+            document.getElementById('modalSubtitle').innerText = `Final Happiness: ${gameScore}`;
+            document.getElementById('modalContent').innerHTML = "";
+
+            const aiBox = document.getElementById('aiFeedbackBox');
+            aiBox.classList.remove('hidden');
+            document.getElementById('aiText').innerText = "Generating warm thoughts...";
+            
+            document.getElementById('modalBtnPrimary').innerText = "Play Again";
+            document.getElementById('modalBtnPrimary').onclick = () => {
+                modal.classList.add('hidden');
+                startGame();
+            };
+
+            const advice = await getGeminiResponse(
+                `Player finished a relaxing balloon game with score ${gameScore}. 
+                Give a very short, cute, positive message about staying lighthearted (max 15 words).`, 
+                "You are a cheerful friend."
+            );
+            document.getElementById('aiText').innerText = advice;
+        }
+
+        // --- QUIZ SYSTEM ---
+        const quizData = [
+            { q: "What helps when you feel worried?", a: ["Deep Breaths 🌬️", "Yelling 🗯️"], correct: 0, info: "Breathing deeply tells your brain to relax!" },
+            { q: "Is it okay to feel sad sometimes?", a: ["No, never", "Yes, it's okay"], correct: 1, info: "All feelings are normal. It's okay to be sad." },
+            { q: "Who can you talk to if you're upset?", a: ["A trusted adult", "Nobody"], correct: 0, info: "Talking to a parent, teacher, or friend helps a lot." },
+            { q: "What is good for your mind?", a: ["Staying up late", "Playing & Sleeping"], correct: 1, info: "Sleep and play give your brain energy!" }
+        ];
+        let currentQ = 0;
+        let quizScore = 0;
+
+        function startQuiz() {
+            currentQ = 0; quizScore = 0;
+            document.getElementById('modalOverlay').classList.remove('hidden');
+            document.getElementById('aiFeedbackBox').classList.add('hidden');
+            renderQuiz();
+        }
+
+        function renderQuiz() {
+            const q = quizData[currentQ];
+            document.getElementById('modalIcon').innerText = "🧩";
+            document.getElementById('modalTitle').innerText = `Question ${currentQ + 1}`;
+            document.getElementById('modalSubtitle').innerText = q.q;
+            
+            const content = document.getElementById('modalContent');
+            content.innerHTML = '';
+            const grid = document.createElement('div');
+            grid.className = 'grid gap-3';
+            
+            q.a.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full p-4 bg-white hover:bg-sky-50 border-2 border-slate-100 rounded-xl text-left font-bold text-slate-600 transition shadow-sm";
+                btn.innerText = opt;
+                btn.onclick = () => handleQuizAnswer(idx, q, btn);
+                grid.appendChild(btn);
+            });
+            content.appendChild(grid);
+            
+            document.getElementById('modalBtnPrimary').classList.add('hidden');
+            document.getElementById('modalBtnSecondary').classList.add('hidden');
+        }
+
+        function handleQuizAnswer(idx, q, btn) {
+            const btns = document.getElementById('modalContent').querySelectorAll('button');
+            btns.forEach(b => b.disabled = true);
+
+            if (idx === q.correct) {
+                btn.classList.add('bg-green-100', 'border-green-300', 'text-green-700');
+                quizScore++;
+                playSound('good');
+            } else {
+                btn.classList.add('bg-rose-100', 'border-rose-300', 'text-rose-700');
+                playSound('bad');
+            }
+
+            const info = document.createElement('div');
+            info.className = "mt-4 text-sm text-sky-600 bg-sky-100 p-3 rounded-xl font-semibold";
+            info.innerText = q.info;
+            document.getElementById('modalContent').appendChild(info);
+
+            const nextBtn = document.getElementById('modalBtnPrimary');
+            nextBtn.classList.remove('hidden');
+            
+            if (currentQ < quizData.length - 1) {
+                nextBtn.innerText = "Next →";
+                nextBtn.onclick = () => { currentQ++; renderQuiz(); };
+            } else {
+                nextBtn.innerText = "Finish";
+                nextBtn.onclick = endQuiz;
+            }
+        }
+
+        async function endQuiz() {
+            document.getElementById('modalTitle').innerText = "Great Job!";
+            document.getElementById('modalSubtitle').innerText = `You got ${quizScore}/${quizData.length} right!`;
+            document.getElementById('modalContent').innerHTML = '';
+            
+            const aiBox = document.getElementById('aiFeedbackBox');
+            aiBox.classList.remove('hidden');
+            document.getElementById('aiText').innerText = "Thinking...";
+            
+            const btn = document.getElementById('modalBtnPrimary');
+            btn.innerText = "Close";
+            btn.onclick = goHome;
+
+            const feedback = await getGeminiResponse(
+                `Kid got ${quizScore}/${quizData.length} on mental health quiz. Give short high-five message.`,
+                "You are a kind teacher."
+            );
+            document.getElementById('aiText').innerText = feedback;
+        }
+
+        // --- ZEN CHAT & API ---
+        async function getGeminiResponse(prompt, systemContext) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+            const payload = { contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: systemContext }] } };
+            try {
+                const res = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                const data = await res.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm taking a moment to think...";
+            } catch (e) { return "Oops, my connection is fuzzy. Try again?"; }
+        }
+
+        function openZenChat() { document.getElementById('chatDrawer').classList.remove('translate-x-full'); }
+        function closeZenChat() { document.getElementById('chatDrawer').classList.add('translate-x-full'); }
+        
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const history = document.getElementById('chatHistory');
+            
+            const uDiv = document.createElement('div');
+            uDiv.className = 'user-msg p-4 text-sm self-end max-w-[85%] mb-2 shadow-sm';
+            uDiv.innerText = text;
+            history.appendChild(uDiv);
+            input.value = '';
+            history.scrollTop = history.scrollHeight;
+
+            const lDiv = document.createElement('div');
+            lDiv.className = 'ai-msg p-4 text-sm self-start max-w-[85%] flex gap-2';
+            lDiv.innerHTML = '<span class="typing-dot w-2 h-2 bg-slate-400 rounded-full"></span><span class="typing-dot w-2 h-2 bg-slate-400 rounded-full" style="animation-delay:0.1s"></span>';
+            history.appendChild(lDiv);
+
+            const reply = await getGeminiResponse(text, "You are Friend Bot, a gentle companion for kids/teens. Keep advice simple, comforting, and short (max 3 sentences). Use emojis.");
+            
+            history.removeChild(lDiv);
+            const aDiv = document.createElement('div');
+            aDiv.className = 'ai-msg p-4 text-sm self-start max-w-[85%] mb-2';
+            aDiv.innerHTML = marked.parse(reply);
+            history.appendChild(aDiv);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function goHome() {
+            document.getElementById('modalOverlay').classList.add('hidden');
+            document.getElementById('guideOverlay').classList.add('hidden');
+            document.getElementById('gameHUD').classList.add('hidden');
+            canvas.classList.add('hidden');
+            document.getElementById('mainMenu').classList.remove('opacity-0', 'pointer-events-none');
+            gameState = 'menu';
+        }
+
+        // --- AUDIO ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            if (type === 'good') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(400, now); osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            } else {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(150, now); osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            }
+        }
+    </script>
+</body>
+</html>
